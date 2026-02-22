@@ -46,7 +46,7 @@ struct SshKeyNew {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct SshserviceResponseNew {
+struct SshserviceSuccessResponseNew {
     ssh_key: SshKeyNew,
 }
 
@@ -60,8 +60,14 @@ struct SshKeyCertNew {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct SshserviceResponseCertNew {
+struct SshserviceSuccessResponseCertNew {
     ssh_key: SshKeyCertNew,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct SshserviceErrorResponse {
+    message: String,
 }
 
 // Ensure downloaded ssh keys end with \n
@@ -112,11 +118,11 @@ fn download_key_oidc(config: &Config) -> anyhow::Result<()> {
         .send()?;
 
     if !response.status().is_success() {
-        //let error_text = response.text().unwrap_or_else(|_| "Failed to read error response".to_string());
-        //bail!("Failed to download SSH key. HTTP status: {}. Response: {}", response.status(), error_text);
+        let error_response_struct: SshserviceErrorResponse = response.json()?;
+        bail!("{}", error_response_struct.message);
     }
 
-    let response_struct: SshserviceResponseNew = response.json()?;
+    let response_struct: SshserviceSuccessResponseNew = response.json()?;
 
     let private_key_path = config.key_path.clone();
     let public_key_path = PathBuf::from(format!("{}-cert.pub", private_key_path.display()));
@@ -182,14 +188,14 @@ fn sign_key_oidc(config: &Config) -> anyhow::Result<()> {
         .send()?;
 
     if !response.status().is_success() {
-        //let error_text = response.text().unwrap_or_else(|_| "Failed to read error response".to_string());
-        //bail!("Failed to download SSH key. HTTP status: {}. Response: {}", response.status(), error_text);
+        let error_response_struct: SshserviceErrorResponse = response.json()?;
+        bail!("{}", error_response_struct.message);
     }
 
     //debug!("response: {:?}", response);
     //debug!("response.text: {:?}", response.text()?);
 
-    let response_struct: SshserviceResponseCertNew = response.json()?;
+    let response_struct: SshserviceSuccessResponseCertNew = response.json()?;
     //let response_struct = response.text()?;
     debug!("{:?}", response_struct);
 

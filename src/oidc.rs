@@ -172,7 +172,12 @@ fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
         .map(|(_, value)| value.into_owned())
         .context("No code found")?;
 
-    let response = "HTTP/1.1 200 OK\r\n\r\nAuthentication successful.\nYou can return to the terminal.";
+    const SUCCESS_HTML: &str = include_str!("../templates/oidc_auth_success.html");
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
+        SUCCESS_HTML.len(),
+        SUCCESS_HTML
+    );
     stream.write_all(response.as_bytes())?;
 
     // Pass the reference to the client here too

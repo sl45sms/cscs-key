@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Successful</title>
+    <link rel="icon" type="image/png" href="https://www.cscs.ch/favicon.ico">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+        }
+        .logo {
+            max-width: 150px;
+            margin-bottom: 1.5rem;
+        }
+        h1 { color: #333; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        p { color: #666; }
+        .success-icon { color: #28a745; font-size: 3rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Authentication Successful</h1>
+        <p>You have successfully logged into the CSCS CLI.</p>
+        <p><strong>You can close this window and return to your terminal.</strong></p>
+    </div>
+    <script>
+        setTimeout(function() {
+            window.close();
+        }, 3000);
+    </script>
+</body>
+</html>

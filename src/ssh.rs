@@ -15,10 +15,23 @@ use crate::oidc::get_access_token;
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Download a new SSH key pair
+    ///
+    /// This command downloads a new SSH key pair from the SSH service.
+    /// The private key will be saved to the path specified in the config or -f/--file.
+    /// The public key certificate will be saved the same path with '-cert.pub' suffix.
     Gen,
+    /// Sign an existing SSH public key
+    ///
+    /// This command reads an existing SSH public key from the path specified in the config
+    /// or -f/--file with'-signing.pub' suffix, sends it to the SSH service for signing, and saves the signed
+    /// certificate to the same path with '-signing-cert.pub' suffix.
     Sign,
+    /// Print status of generated keys
     Status,
+    /// Not implemented yet: List all SSH keys associated with the user
     List,
+    /// Not implemented yet: Revoke kyes associated with the user
     Revoke,
 }
 

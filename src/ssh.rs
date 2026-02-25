@@ -100,6 +100,7 @@ struct ListKeys {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RevokeKey {
     serial_number: String,
     reason: String,

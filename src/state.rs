@@ -4,12 +4,13 @@ use std::fs;
 use serde::{Serialize, Deserialize};
 use serde_json;
 use chrono::{DateTime, Utc, Duration};
+use std::collections::HashMap;
 use log::info;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct AppState {
     pub oidc_token: Option<TokenStore>,
-    pub ssh_cert: Option<CertMetadata>,
+    pub keys: Option<HashMap<PathBuf, CertMetadata>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -20,10 +21,17 @@ pub struct TokenStore {
     pub expiration: Option<DateTime<Utc>>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum KeyOrigin {
+    Local,
+    Remote,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct CertMetadata {
     pub key_path: PathBuf,
     pub cert_path: PathBuf,
+    pub origin: KeyOrigin,
     pub serial_number: String,
     pub expires_at: String,
 }

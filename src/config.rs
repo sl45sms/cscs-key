@@ -83,10 +83,10 @@ impl Config {
 
 #[derive(Parser, Debug, Deserialize, Serialize)]
 pub struct ConfigCliOverride {
-    #[arg(long, global = true)]
+    #[arg(long, global = true, hide = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_path: Option<PathBuf>,
-    #[arg(long, global = true)]
+    #[arg(long, global = true, hide = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_validity: Option<String>,
 }

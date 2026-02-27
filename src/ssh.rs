@@ -66,6 +66,8 @@ pub struct ListArgs {
 pub struct RevokeArgs {
     #[arg(num_args = 1.., help = "Serial numbers of the SSH key certificates to revoke, \"all\" revokes all keys")]
     pub key_id: Vec<String>,
+    #[arg(short, long, help = "Revoke all SSH keys")]
+    pub all: bool,
     #[arg(long, help = "Dry run: print which keys would be revoked without actually revoking them")]
     pub dry: bool,
 }
@@ -414,7 +416,7 @@ fn revoke_keys(config: &Config, args: &RevokeArgs) -> anyhow::Result<()> {
     debug!("ssh-key revoke subcommand");
     debug!("{:?}", config);
 
-    if args.key_id.len() == 1 && args.key_id[0].to_lowercase() == "all" {
+    if args.all || (args.key_id.len() == 1 && args.key_id[0].to_lowercase() == "all") {
         let ssh_keys = list_keys_internal(&config, false)?;
         for key in ssh_keys {
             revoke_key(&config, key.serial_number, args.dry)?;

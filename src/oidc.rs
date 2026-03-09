@@ -205,15 +205,13 @@ fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
 fn login_via_api_key(config: &Config, api_key: &str) -> anyhow::Result<TokenStore> {
     info!("Get OIDC token using API Key");
 
-    let token_url = "https://api-service-account.hpc-user.tds.cscs.ch/api/v1/auth/token".to_string();
-
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .context("Failed to initialize HTTP client.")?;
 
-    let response = client.post(token_url)
+    let response = client.post(config.env.token_url.clone())
         .header("X-API-Key", api_key)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")

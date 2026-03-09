@@ -11,6 +11,7 @@ use crate::ssh::KeyDuration;
 pub struct EnvConfig {
     pub pkce_client_id: String,
     pub issuer_url: String,
+    pub token_url: String,
     pub keys_url: String,
     pub sign_url: String,
     pub revoke_url: String,
@@ -30,6 +31,7 @@ impl Environment {
             Self::Prod => EnvConfig {
                 pkce_client_id: "authx-cli".to_string(),
                 issuer_url: "https://auth.cscs.ch/auth/realms/cscs".to_string(),
+                token_url: "https://api-service-account.hpc-user.svc.cscs.ch/api/v1/auth/token".to_string(),
                 keys_url: "https://api-ssh-service.hpc-ssh.svc.cscs.ch/api/v1/ssh-keys".to_string(),
                 sign_url: "https://api-ssh-service.hpc-ssh.svc.cscs.ch/api/v1/ssh-keys/sign".to_string(),
                 revoke_url: "https://api-ssh-service.hpc-ssh.svc.cscs.ch/api/v1/ssh-keys/revoke".to_string(),
@@ -37,6 +39,7 @@ impl Environment {
             Self::Tds => EnvConfig {
                 pkce_client_id: "authx-cli".to_string(),
                 issuer_url: "https://auth-tds.cscs.ch/auth/realms/cscs".to_string(),
+                token_url: "https://api-service-account.hpc-user.tds.cscs.ch/api/v1/auth/token".to_string(),
                 keys_url: "https://api-ssh-service.hpc-ssh.tds.cscs.ch/api/v1/ssh-keys".to_string(),
                 sign_url: "https://api-ssh-service.hpc-ssh.tds.cscs.ch/api/v1/ssh-keys/sign".to_string(),
                 revoke_url: "https://api-ssh-service.hpc-ssh.tds.cscs.ch/api/v1/ssh-keys/revoke".to_string(),

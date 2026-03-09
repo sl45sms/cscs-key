@@ -83,6 +83,15 @@ pub enum KeyDuration {
     Minute,
 }
 
+impl Into<Duration> for KeyDuration {
+    fn into(self) -> Duration {
+        match self {
+            KeyDuration::Day => Duration::days(1),
+            KeyDuration::Minute => Duration::minutes(1),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct SshKeyDuration {
     duration: KeyDuration,
@@ -190,18 +199,8 @@ fn download_key(config: &Config, args: &GenArgs) -> anyhow::Result<()> {
     debug!("ssh-key gen-new subcommand");
     debug!("{:?}", config);
 
-    // todo
-    let config_duration = match config.key_validity.as_str() {
-        "1d" => KeyDuration::Day,
-        "1min" => KeyDuration::Minute,
-        _ => {
-            bail!("Invalid key validity duration in config: {}. Supported values are '1d' and '1min'.", config.key_validity);
-        }
-    };
-    // end todo
     let key_duration = SshKeyDuration {
-        // todo
-        duration: args.duration.unwrap_or(config_duration),
+        duration: args.duration.unwrap_or(config.key_validity),
     };
 
     info!("Get OIDC token");
@@ -276,18 +275,9 @@ fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
     info!("Reading public key in {}", public_key_path.display());
     let content = fs::read_to_string(public_key_path)?;
 
-    // todo
-    let config_duration = match config.key_validity.as_str() {
-        "1d" => KeyDuration::Day,
-        "1min" => KeyDuration::Minute,
-        _ => {
-            bail!("Invalid key validity duration in config: {}. Supported values are '1d' and '1min'.", config.key_validity);
-        }
-    };
-    // end todo
     let public_key = PublicKey {
         public_key: content,
-        duration: args.duration.unwrap_or(config_duration),
+        duration: args.duration.unwrap_or(config.key_validity),
     };
     debug!("public_key: {:?}", serde_json::to_string(&public_key)?);
 
@@ -371,9 +361,9 @@ fn status_key(config: &Config) -> anyhow::Result<()> {
     let duration_since_modified = now.duration_since(modified_time)
         .map_err(|e| anyhow!("System time is earlier than file modification time: {}", e))?;
 
-    let validity = duration_str::parse(config.key_validity.clone()).unwrap();
+    let validity: Duration = config.key_validity.into();
 
-    if duration_since_modified > validity {
+    if duration_since_modified > validity.to_std().unwrap() {
         println!("SSH key is EXPIRED (last modified {} ago).",
             format_duration(duration_since_modified));
         bail!("SSH key is expired. Please run 'ssh-key download' to renew.");

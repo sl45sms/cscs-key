@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use anyhow::Context;
 use figment::{Figment, providers::{Format, Toml, Serialized}};
 
+use crate::ssh::KeyDuration;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvConfig {
     pub pkce_client_id: String,
@@ -46,7 +48,7 @@ impl Environment {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RawConfig {
     pub key_path: PathBuf,
-    pub key_validity: String,
+    pub key_validity: KeyDuration,
     #[serde(default)]
     pub env: Environment,
 }
@@ -54,7 +56,7 @@ pub struct RawConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub key_path: PathBuf,
-    pub key_validity: String,
+    pub key_validity: KeyDuration,
     pub env: EnvConfig,
 }
 
@@ -88,7 +90,7 @@ pub struct ConfigCliOverride {
     pub key_path: Option<PathBuf>,
     #[arg(long, global = true, hide = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub key_validity: Option<String>,
+    pub key_validity: Option<KeyDuration>,
 }
 
 impl Default for RawConfig {
@@ -97,7 +99,7 @@ impl Default for RawConfig {
             key_path: dirs::home_dir()
                 .expect("Could not determine home directory")
                 .join(".ssh/cscs-key"),
-            key_validity: "1min".to_string(),
+            key_validity: KeyDuration::Day,
             env: Environment::default(),
         }
     }

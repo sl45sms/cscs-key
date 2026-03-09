@@ -11,7 +11,8 @@ mod ssh;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(short, long, global = true, help = "Enable verbose output")]
+    // TODO remove hide = true once we have implemented verbose output
+    #[arg(short, long, global = true, hide = true, help = "Enable verbose output")]
     verbose: bool,
     #[command(subcommand)]
     command: ssh::Commands,
@@ -34,6 +35,7 @@ fn main() -> anyhow::Result<()> {
 
     if cli.verbose {
         println!("Verbose output ...");
+        todo!("Verbose output");
     }
 
     ssh::run(&cli.command, &config)?;

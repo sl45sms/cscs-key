@@ -5,8 +5,7 @@ use serde::Deserialize;
 //use anyhow::{anyhow, bail, Context};
 use anyhow::{anyhow, Context};
 use chrono::{Utc, Duration};
-//use log::{info, debug};
-use log::info;
+use log::{info, debug, trace};
 
 use crate::config::Config;
 use crate::state::{AppState, TokenStore};
@@ -33,8 +32,10 @@ struct ApiKeyResponse {
 }
 
 pub fn get_access_token(config: &Config) -> anyhow::Result<String> {
+    trace!("get access token");
+
     if let Ok(api_key) = std::env::var("CSCS_API_KEY") {
-        info!("Authenticating via Service Account API Key...");
+        debug!("Authenticating via Service Account API Key...");
         let new_store = login_via_api_key(config, &api_key)?;
         // We probably DON'T want to save service account tokens to the user's home cache
         return Ok(new_store.access_token);
@@ -44,16 +45,16 @@ pub fn get_access_token(config: &Config) -> anyhow::Result<String> {
 
     // Try to load token from cache
     if let Some(token) = state.oidc_token {
-        info!("Token exists in store.");
+        debug!("Access token exists in store.");
         // Is the access token still valid?
         if !token.is_expired() {
-            info!("Token exists in store and is valid.");
+            debug!("Access token is valid.");
             return Ok(token.access_token);
         }
 
         // Token is expired, try to use the refresh token
         if let Some(refresh_token) = &token.refresh_token {
-            info!("Access token expired, attempting refresh...");
+            debug!("Access token is expired, attempting refresh...");
             match refresh_access_token(config, refresh_token) {
                 Ok(new_token) => {
                     let ret_access_token = new_token.access_token.clone();
@@ -62,14 +63,14 @@ pub fn get_access_token(config: &Config) -> anyhow::Result<String> {
                     return Ok(ret_access_token);
                 }
                 Err(e) => {
-                    info!("Refresh failed: {}. Falling back to browser login.", e);
+                    debug!("Access token refresh failed: {}. Falling back to browser login.", e);
                 }
             }
         }
     }
 
-    info!("Token does not exist in store or was not refreshed -> browser authentication.");
     // Cache or refresh failed -> Browser login
+    debug!("Token does not exist in store or was not refreshed -> browser authentication.");
     let new_token = login_via_browser(config)?;
     let ret_access_token = new_token.access_token.clone();
     state.oidc_token = Some(new_token);
@@ -78,6 +79,8 @@ pub fn get_access_token(config: &Config) -> anyhow::Result<String> {
 }
 
 fn refresh_access_token(config: &Config, refresh_token: &str) -> anyhow::Result<TokenStore> {
+    trace!("refresh access token");
+
     let http_client = reqwest::blocking::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(10))
@@ -112,7 +115,7 @@ fn refresh_access_token(config: &Config, refresh_token: &str) -> anyhow::Result<
 }
 
 fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
-    info!("Get OIDC token");
+    trace!("login via browser");
 
     // In 4.x, we create a reusable reqwest client first
     let http_client = reqwest::blocking::Client::builder()
@@ -145,8 +148,8 @@ fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
 
     // Open the browser!
     if let Err(e) = webbrowser::open(auth_url.as_str()) {
-        eprintln!("Failed to open browser automatically: {}", e);
-        println!("Browser window did not open automatically. Log in here :\n{}", auth_url);
+        debug!("Failed to open browser automatically: {}", e);
+        info!("Browser window did not open automatically. Log in here :\n{}", auth_url);
     }
 
     // Simple listener
@@ -219,7 +222,7 @@ fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
 }
 
 fn login_via_api_key(config: &Config, api_key: &str) -> anyhow::Result<TokenStore> {
-    info!("Get OIDC token using API Key");
+    trace!("get access token using API key");
 
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(5))

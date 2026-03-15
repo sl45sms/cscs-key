@@ -4,11 +4,13 @@ use directories::ProjectDirs;
 use std::path::PathBuf;
 use anyhow::Context;
 use figment::{Figment, providers::{Format, Toml, Serialized}};
+use log::trace;
 
 use crate::ssh::KeyDuration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvConfig {
+    pub name: String,
     pub pkce_client_id: String,
     pub issuer_url: String,
     pub token_url: String,
@@ -29,6 +31,7 @@ impl Environment {
     pub fn to_config(&self) -> EnvConfig {
         match self {
             Self::Prod => EnvConfig {
+                name: "prod".to_string(),
                 pkce_client_id: "authx-cli".to_string(),
                 issuer_url: "https://auth.cscs.ch/auth/realms/cscs".to_string(),
                 token_url: "https://api-service-account.hpc-user.svc.cscs.ch/api/v1/auth/token".to_string(),
@@ -37,6 +40,7 @@ impl Environment {
                 revoke_url: "https://api-ssh-service.hpc-ssh.svc.cscs.ch/api/v1/ssh-keys/revoke".to_string(),
             },
             Self::Tds => EnvConfig {
+                name: "tds".to_string(),
                 pkce_client_id: "authx-cli".to_string(),
                 issuer_url: "https://auth-tds.cscs.ch/auth/realms/cscs".to_string(),
                 token_url: "https://api-service-account.hpc-user.tds.cscs.ch/api/v1/auth/token".to_string(),
@@ -65,10 +69,17 @@ pub struct Config {
 
 impl Config {
     pub fn load(cli_env: Option<Environment>, cli_overrides: &ConfigCliOverride) -> anyhow::Result<Self> {
+        trace!("Loading app configuration");
+
         let proj_dirs = ProjectDirs::from("ch", "cscs", "cscs-key")
             .context("Could not determine configuration directory")?;
         let config_dir = proj_dirs.config_dir();
         let config_file_path = config_dir.join("config.toml");
+
+        trace!("Config priorities:
+    1. cli args
+    2. config file {}
+    3. default values", config_file_path.display());
 
         let raw_config: RawConfig = Figment::new()
             .merge(Serialized::defaults(RawConfig::default()))
@@ -77,6 +88,7 @@ impl Config {
             .extract()?;
 
         let active_env = cli_env.unwrap_or(raw_config.env);
+        trace!("Using environment: {}", active_env.to_config().name);
 
         Ok(Self {
             key_path: raw_config.key_path,

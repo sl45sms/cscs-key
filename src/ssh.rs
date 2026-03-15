@@ -13,7 +13,7 @@ use humantime::format_duration;
 use chrono_humanize::HumanTime;
 use comfy_table::Table;
 use comfy_table::presets::UTF8_FULL;
-use log::{info, debug};
+use log::{info, debug, trace};
 
 use crate::config::Config;
 use crate::oidc::get_access_token;
@@ -184,7 +184,8 @@ where
 }
 
 pub fn run(command: &Commands, config: &Config) -> anyhow::Result<()> {
-    debug!{"ssh-key command"};
+    trace!("{} entrypoint", env!("CARGO_PKG_NAME"));
+    trace!("{:?}", config);
     match command {
         Commands::Gen(args) => download_key(&config, args)?,
         Commands::Sign(args) => sign_key(&config, args)?,
@@ -197,14 +198,12 @@ pub fn run(command: &Commands, config: &Config) -> anyhow::Result<()> {
 }
 
 fn download_key(config: &Config, args: &GenArgs) -> anyhow::Result<()> {
-    debug!("ssh-key gen subcommand");
-    debug!("{:?}", config);
+    trace!("gen subcommand");
+    trace!("{:?}", args);
 
     let key_duration = SshKeyDuration {
         duration: args.duration.unwrap_or(config.key_validity),
     };
-
-    info!("Get OIDC token");
 
     let access_token = get_access_token(&config)?;
 
@@ -237,11 +236,11 @@ fn download_key(config: &Config, args: &GenArgs) -> anyhow::Result<()> {
 
     // Save public key
     let mut public_file = File::create(&public_key_path)?;
-    info!("Saving public key in {}", public_key_path.display());
+    debug!("Saving public key in {}", public_key_path.display());
     public_file.write_all(response_struct.ssh_key.public_key.as_bytes())?;
     #[cfg(unix)] // Only apply on Unix-like systems
     {
-        info!("Setting permissions for public key to 0o644: {}", public_key_path.display());
+        debug!("Setting permissions for public key to 0o644: {}", public_key_path.display());
         use std::os::unix::fs::PermissionsExt;
         let mut permissions = public_file.metadata()?.permissions();
         permissions.set_mode(0o644); // Read/write for owner only
@@ -251,38 +250,36 @@ fn download_key(config: &Config, args: &GenArgs) -> anyhow::Result<()> {
 
     // Save private key
     let mut private_file = File::create(&private_key_path)?;
-    info!("Saving private key in {}", private_key_path.display());
+    debug!("Saving private key in {}", private_key_path.display());
     private_file.write_all(response_struct.ssh_key.private_key.as_bytes())?;
     #[cfg(unix)] // Only apply on Unix-like systems
     {
-        info!("Setting permissions for private key to 0o600: {}", private_key_path.display());
+        debug!("Setting permissions for private key to 0o600: {}", private_key_path.display());
         use std::os::unix::fs::PermissionsExt;
         let mut permissions = private_file.metadata()?.permissions();
         permissions.set_mode(0o600); // Read/write for owner only
         std::fs::set_permissions(&private_key_path, permissions)?;
     }
-    println!("Private SSH key successfully downloaded to: {}", private_key_path.display());
+    info!("Private SSH key successfully downloaded to: {}", private_key_path.display());
 
     Ok(())
 }
 
 fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
-    debug!("ssh-key gen subcommand");
-    debug!("{:?}", config);
+    trace!("sign subcommand");
+    trace!("{:?}", args);
 
     //let private_key_path = args.file.clone();
     let private_key_path = args.file.clone().unwrap_or(config.key_path.clone());
     let public_key_path = PathBuf::from(format!("{}-signing.pub", private_key_path.display()));
-    info!("Reading public key in {}", public_key_path.display());
+    debug!("Reading public key in {}", public_key_path.display());
     let content = fs::read_to_string(public_key_path)?;
 
     let public_key = PublicKey {
         public_key: content,
         duration: args.duration.unwrap_or(config.key_validity),
     };
-    debug!("public_key: {:?}", serde_json::to_string(&public_key)?);
-
-    info!("Get OIDC token");
+    trace!("public_key: {:?}", serde_json::to_string(&public_key)?);
 
     let access_token = get_access_token(&config)?;
 
@@ -303,12 +300,12 @@ fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
         bail!("{}", error_response_struct.message);
     }
 
-    //debug!("response: {:?}", response);
-    //debug!("response.text: {:?}", response.text()?);
+    //trace!("response: {:?}", response);
+    //trace!("response.text: {:?}", response.text()?);
 
     let response_struct: SshserviceSuccessResponseCert = response.json()?;
     //let response_struct = response.text()?;
-    debug!("{:?}", response_struct);
+    trace!("{:?}", response_struct);
 
     let private_key_path = args.file.clone().unwrap_or(config.key_path.clone());
     let public_key_path = PathBuf::from(format!("{}-signing-cert.pub", private_key_path.display()));
@@ -319,30 +316,29 @@ fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
 
     // Save public key
     let mut public_file = File::create(&public_key_path)?;
-    info!("Saving public key in {}", public_key_path.display());
+    debug!("Saving public key in {}", public_key_path.display());
     public_file.write_all(response_struct.ssh_key.public_key.as_bytes())?;
     #[cfg(unix)] // Only apply on Unix-like systems
     {
-        info!("Setting permissions for public key to 0o644: {}", public_key_path.display());
+        debug!("Setting permissions for public key to 0o644: {}", public_key_path.display());
         use std::os::unix::fs::PermissionsExt;
         let mut permissions = public_file.metadata()?.permissions();
         permissions.set_mode(0o644); // Read/write for owner only
         std::fs::set_permissions(&public_key_path, permissions)?;
     }
-    info!("Public SSH key successfully downloaded to {}", public_key_path.display());
+    info!("Public SSH certificate successfully downloaded to {}", public_key_path.display());
 
     Ok(())
 }
 
 fn status_key(config: &Config) -> anyhow::Result<()> {
-    debug!("ssh-key status subcommand");
-    debug!("{:?}", config);
+    trace!("status subcommand");
 
     let metadata_result = metadata(&config.key_path);
     let file_metadata = match metadata_result {
         Ok(meta) => {
             if meta.is_file() {
-                info!("SSH key file found at: {}", &config.key_path.display());
+                debug!("SSH key file found at: {}", &config.key_path.display());
                 meta
             } else {
                 bail!("Path '{}' exists but is not a file (it's a directory or other type).", &config.key_path.display());
@@ -356,7 +352,7 @@ fn status_key(config: &Config) -> anyhow::Result<()> {
         }
     };
 
-    debug!("{:?}", file_metadata);
+    trace!("{:?}", file_metadata);
     let modified_time = file_metadata.modified()?;
     let now = SystemTime::now();
     let duration_since_modified = now.duration_since(modified_time)
@@ -365,11 +361,11 @@ fn status_key(config: &Config) -> anyhow::Result<()> {
     let validity: Duration = config.key_validity.into();
 
     if duration_since_modified > validity.to_std().unwrap() {
-        println!("SSH key is EXPIRED (last modified {} ago).",
+        info!("SSH key is EXPIRED (last modified {} ago).",
             format_duration(duration_since_modified));
         bail!("SSH key is expired. Please run 'ssh-key download' to renew.");
     } else {
-        println!("SSH key is VALID (last modified {} ago).",
+        info!("SSH key is VALID (last modified {} ago).",
             format_duration(duration_since_modified));
     }
 
@@ -377,9 +373,8 @@ fn status_key(config: &Config) -> anyhow::Result<()> {
 }
 
 fn list_keys(config: &Config, args: &ListArgs) -> anyhow::Result<()> {
-    debug!("ssh-key list subcommand");
-    debug!("{:?}", config);
-    debug!("{:?}", args);
+    trace!("list subcommand");
+    trace!("{:?}", args);
 
     let ssh_keys = list_keys_internal(&config, args.all)?;
 
@@ -398,14 +393,14 @@ fn list_keys(config: &Config, args: &ListArgs) -> anyhow::Result<()> {
 
         table.add_row(vec![key.serial_number, valid.to_string(), HumanTime::from(expiration).to_string(), key.expire_time.with_timezone(&Local).to_string()]);
     }
-    println!("{table}");
+    info!("{table}");
 
     Ok(())
 }
 
 fn revoke_keys(config: &Config, args: &RevokeArgs) -> anyhow::Result<()> {
-    debug!("ssh-key revoke subcommand");
-    debug!("{:?}", config);
+    trace!("revoke subcommand");
+    trace!("{:?}", args);
 
     if args.all || (args.key_id.len() == 1 && args.key_id[0].to_lowercase() == "all") {
         let ssh_keys = list_keys_internal(&config, false)?;
@@ -426,7 +421,7 @@ fn list_keys_internal(config: &Config, all: bool) -> anyhow::Result<Vec<SshKeyCe
         include_revoked: all,
         include_expired: all,
     };
-    debug!("{:?}", list_keys);
+    trace!("{:?}", list_keys);
 
     let access_token = get_access_token(&config)?;
 
@@ -447,19 +442,19 @@ fn list_keys_internal(config: &Config, all: bool) -> anyhow::Result<Vec<SshKeyCe
         bail!("{}", error_response_struct.message);
     }
 
-    //debug!("response: {:?}", response);
-    //debug!("response.text: {:?}", response.text()?);
+    //trace!("response: {:?}", response);
+    //trace!("response.text: {:?}", response.text()?);
 
     let response_struct: SshserviceSuccessResponseCerts = response.json()?;
     //let response_struct = response.text()?;
-    //debug!("{:?}", response_struct);
+    //trace!("{:?}", response_struct);
 
     Ok(response_struct.ssh_keys)
 }
 
 fn revoke_key(config: &Config, key_id: String, dry: bool) -> anyhow::Result<()> {
     if dry {
-        println!("Dry run: Would revoke key {}", key_id);
+        info!("Dry run: Would revoke key {}", key_id);
         return Ok(());
     }
 
@@ -467,7 +462,7 @@ fn revoke_key(config: &Config, key_id: String, dry: bool) -> anyhow::Result<()> 
         serial_number: key_id.to_string(),
         reason: "user request".to_string(),
     };
-    debug!("{:?}", revoke_key);
+    trace!("{:?}", revoke_key);
 
     let access_token = get_access_token(&config)?;
 
@@ -488,11 +483,11 @@ fn revoke_key(config: &Config, key_id: String, dry: bool) -> anyhow::Result<()> 
         bail!("{}", error_response_struct.message);
     }
 
-    //debug!("response: {:?}", response);
-    //debug!("response.text: {:?}", response.text()?);
+    //trace!("response: {:?}", response);
+    //trace!("response.text: {:?}", response.text()?);
 
     let response_struct: SshserviceSuccessResponseRevoke = response.json()?;
-    //debug!("{:?}", response_struct);
+    //trace!("{:?}", response_struct);
 
     let revoked = if response_struct.revoked {
         "✅"
@@ -500,7 +495,7 @@ fn revoke_key(config: &Config, key_id: String, dry: bool) -> anyhow::Result<()> 
         "❌"
     };
 
-    println!("{}: {} {}", key_id, revoked, response_struct.message);
+    info!("{}: {} {}", key_id, revoked, response_struct.message);
 
     Ok(())
 }

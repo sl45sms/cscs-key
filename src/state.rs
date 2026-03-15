@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use serde_json;
 use chrono::{DateTime, Utc, Duration};
 use std::collections::HashMap;
-use log::info;
+use log::debug;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct AppState {
@@ -33,7 +33,7 @@ pub struct CertMetadata {
     pub cert_path: PathBuf,
     pub origin: KeyOrigin,
     pub serial_number: String,
-    pub expires_at: String,
+    pub expires_at: DateTime<Utc>,
 }
 
 impl AppState {
@@ -47,7 +47,7 @@ impl AppState {
 
     pub fn load() -> anyhow::Result<Self> {
         let path = Self::get_path()?;
-        info!("Trying to load state from {}", path.display());
+        debug!("Trying to load state from cache {}", path.display());
         if !path.exists() {
             return Ok(Self::default());
         }
@@ -57,7 +57,7 @@ impl AppState {
 
     pub fn save(&self) -> anyhow::Result<()> {
         let path = Self::get_path()?;
-        info!("Saving state to {}", path.display());
+        debug!("Saving state to cache {}", path.display());
         let json = serde_json::to_string_pretty(self)?;
         fs::write(path, json)?;
         Ok(())

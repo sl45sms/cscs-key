@@ -393,6 +393,7 @@ dependencies = [
  "log",
  "oauth2",
  "openidconnect",
+ "regex",
  "reqwest",
  "secrecy",
  "serde",

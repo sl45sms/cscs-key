@@ -196,6 +196,11 @@ where
     Ok(SecretString::from(ensure_newline(s)))
 }
 
+fn redact_private_key(s: &str) -> String {
+    let re = regex::Regex::new(r"(?s)(-----BEGIN [A-Z ]+PRIVATE KEY-----).*?(-----END [A-Z ]+PRIVATE KEY-----)").unwrap();
+    re.replace_all(s, "[REDACTED PRIVATE KEY]").to_string()
+}
+
 pub fn run(command: &Commands, config: &Config) -> anyhow::Result<()> {
     trace!("{} entrypoint", env!("CARGO_PKG_NAME"));
     trace!("{:?}", config);
@@ -244,8 +249,11 @@ fn download_key(config: &Config, args: &GenArgs) -> anyhow::Result<()> {
         .with_context(||
             format!(
                 "Failed to parse the respons form SSH servide. Response body: {:?}",
-                String::from_utf8_lossy(&response_bytes)
-            ))?;
+                redact_private_key(
+                    &String::from_utf8_lossy(&response_bytes)
+                )
+            )
+        )?;
     trace!("Parsed SSH service response: {:?}", response_struct);
 
     //let private_key_path = args.file.clone();

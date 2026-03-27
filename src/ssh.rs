@@ -26,13 +26,15 @@ pub enum Commands {
     ///
     /// This command downloads a new SSH key pair from the SSH service.
     /// The private key will be saved to the path specified in the config or -f/--file.
+    /// Default private key path is ~/.ssh/cscs-key.
     /// The public key certificate will be saved the same path with '-cert.pub' suffix.
     Gen(GenArgs),
     /// Sign an existing SSH public key
     ///
     /// This command reads an existing SSH public key from the path specified in the config
-    /// or -f/--file with'-signing.pub' suffix, sends it to the SSH service for signing, and saves the signed
-    /// certificate to the same path with '-signing-cert.pub' suffix.
+    /// or -f/--file with '.pub' suffix, sends it to the SSH service for signing, and saves the signed
+    /// certificate to the same path with '-cert.pub' suffix.
+    /// Default private key path is ~/.ssh/cscs-key.
     Sign(SignArgs),
     /// Print status of generated keys
     #[clap(hide = true)]
@@ -302,7 +304,7 @@ fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
 
     //let private_key_path = args.file.clone();
     let private_key_path = args.file.clone().unwrap_or(config.key_path.clone());
-    let public_key_path = PathBuf::from(format!("{}-signing.pub", private_key_path.display()));
+    let public_key_path = PathBuf::from(format!("{}.pub", private_key_path.display()));
     debug!("Reading public key in {}", public_key_path.display());
     let content = fs::read_to_string(public_key_path)?;
 
@@ -343,7 +345,7 @@ fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
     trace!("Parsed SSH service response: {:?}", response_struct);
 
     let private_key_path = args.file.clone().unwrap_or(config.key_path.clone());
-    let public_key_path = PathBuf::from(format!("{}-signing-cert.pub", private_key_path.display()));
+    let public_key_path = PathBuf::from(format!("{}-cert.pub", private_key_path.display()));
 
     if let Some(parent) = private_key_path.parent() {
         std::fs::create_dir_all(parent)?;

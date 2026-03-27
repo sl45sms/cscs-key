@@ -2,8 +2,7 @@
 use std::io::Write;
 use reqwest;
 use serde::Deserialize;
-//use anyhow::{anyhow, bail, Context};
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use chrono::{Utc, Duration};
 use log::{info, debug, trace};
 
@@ -29,6 +28,12 @@ struct ApiKeyResponse {
     access_token: String,
     expires_in: i64,
     id_token: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ApiKeyErrorResponse {
+    message: String,
 }
 
 pub fn get_access_token(config: &Config) -> anyhow::Result<String> {
@@ -237,7 +242,21 @@ fn login_via_api_key(config: &Config, api_key: &str) -> anyhow::Result<TokenStor
         .send()
         .context("Failed to send request to get access token.")?;
 
-    let response_struct: ApiKeyResponse = response.json()?;
+    let status = response.status();
+    let response_bytes = response.bytes()?;
+
+    if !status.is_success() {
+        let error_response_struct: ApiKeyErrorResponse = serde_json::from_slice(&response_bytes)?;
+        bail!("{}", error_response_struct.message);
+    }
+
+    let response_struct: ApiKeyResponse = serde_json::from_slice(&response_bytes)
+        .with_context(||
+            format!(
+                "Failed to parse the respons form Keycloak. Response body: {:?}",
+                String::from_utf8_lossy(&response_bytes)
+            ))?;
+    trace!("Parsed Keycloak response: {:?}", response_struct);
 
     let expires_in = Duration::seconds(response_struct.expires_in);
     let expiration = Utc::now() + expires_in;

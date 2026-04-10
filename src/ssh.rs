@@ -310,7 +310,14 @@ fn sign_key(config: &Config, args: &SignArgs) -> anyhow::Result<()> {
     let private_key_path = args.file.clone().unwrap_or(config.key_path.clone());
     let public_key_path = PathBuf::from(format!("{}.pub", private_key_path.display()));
     debug!("Reading public key in {}", public_key_path.display());
-    let content = fs::read_to_string(public_key_path)?;
+    let content = fs::read_to_string(&public_key_path)
+        .with_context(|| format!(
+            "Public SSH key not found at {}. The `sign` command expects an existing public key file. Create one with `ssh-keygen -t ed25519 -f {}` or recover it from the private key with `ssh-keygen -y -f {} > {}`.",
+            public_key_path.display(),
+            private_key_path.display(),
+            private_key_path.display(),
+            public_key_path.display(),
+        ))?;
 
     let public_key = PublicKey {
         public_key: content,

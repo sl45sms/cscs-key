@@ -132,12 +132,17 @@ fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
     // Discovery takes a reference to the client
     let provider_metadata = CoreProviderMetadata::discover(&issuer_url, &http_client)?;
 
+    let redirect_url_value = std::env::var("CSCS_OIDC_REDIRECT_URL")
+        .unwrap_or_else(|_| "http://localhost:8765".to_string());
+    let bind_addr = std::env::var("CSCS_OIDC_BIND_ADDR")
+        .unwrap_or_else(|_| "127.0.0.1:8765".to_string());
+
     let client = CoreClient::from_provider_metadata(
         provider_metadata,
         ClientId::new(config.env.pkce_client_id.clone()),
         None,
     )
-    .set_redirect_uri(RedirectUrl::new("http://localhost:8765".to_string())?);
+    .set_redirect_uri(RedirectUrl::new(redirect_url_value.clone())?);
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -154,18 +159,19 @@ fn login_via_browser(config: &Config) -> anyhow::Result<TokenStore> {
     // Open the browser!
     if let Err(e) = webbrowser::open(auth_url.as_str()) {
         debug!("Failed to open browser automatically: {}", e);
-        info!("Browser window did not open automatically. Log in here :\n{}", auth_url);
     }
+    info!("Complete the login in your browser:\n{}", auth_url);
 
     // Simple listener
-    let listener = TcpListener::bind("127.0.0.1:8765")?;
+    let listener = TcpListener::bind(bind_addr.as_str())
+        .with_context(|| format!("Failed to bind local callback listener on {}", bind_addr))?;
     let (mut stream, _) = listener.accept()?;
     let mut reader = BufReader::new(&stream);
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
 
-    let redirect_url = request_line.split_whitespace().nth(1).unwrap_or("");
-    let url = Url::parse(&format!("http://localhost:8765{}", redirect_url))?;
+    let redirect_path = request_line.split_whitespace().nth(1).unwrap_or("");
+    let url = Url::parse(&redirect_url_value)?.join(redirect_path)?;
 
     // Check CSRF: Unlikely on localhost, but better be careful
     let returned_state = url.query_pairs()

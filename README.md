@@ -57,7 +57,7 @@ docker run --rm -it \
 Or use the included shortcut script:
 ```bash
 chmod +x ./cscs-key-docker
-./cscs-key-docker sign
+./cscs-key-docker --help
 ```
 
 Use `--build` if you want the script to rebuild the image first:

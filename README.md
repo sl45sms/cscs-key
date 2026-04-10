@@ -29,6 +29,39 @@ cd cscs-key
 cargo build --release
 ```
 
+## Docker
+
+Build the Docker image:
+```bash
+docker build -t cscs-key .
+```
+
+If you also want to extract the compiled `target/` artifacts from the builder stage to your host:
+```bash
+docker build --target builder -t cscs-key-builder .
+docker create --name cscs-key-build cscs-key-builder
+docker cp cscs-key-build:/app/target ./target
+docker rm cscs-key-build
+```
+
+Run the tool from Docker instead of `target/release/cscs-key`:
+```bash
+docker run --rm -it \
+  -p 8765:8765 \
+  -v "$HOME/.ssh:/home/appuser/.ssh" \
+  -v "$HOME/.config/cscs-key:/home/appuser/.config/cscs-key" \
+  -v "$HOME/.cache/cscs-key:/home/appuser/.cache/cscs-key" \
+  cscs-key sign
+```
+
+For CI or service-account usage, pass the API key explicitly:
+```bash
+docker run --rm \
+  -e CSCS_API_KEY="$CSCS_API_KEY" \
+  -v "$HOME/.ssh:/home/appuser/.ssh" \
+  cscs-key sign
+```
+
 ## Usage
 
 ### Sign ssh key

@@ -54,6 +54,17 @@ docker run --rm -it \
   cscs-key sign
 ```
 
+Or use the included shortcut script:
+```bash
+chmod +x ./cscs-key-docker
+./cscs-key-docker sign
+```
+
+Use `--build` if you want the script to rebuild the image first:
+```bash
+./cscs-key-docker --build sign
+```
+
 If `~/.ssh/cscs-key.pub` does not exist but `~/.ssh/cscs-key` does, the container generates the missing public key automatically before signing.
 
 For CI or service-account usage, pass the API key explicitly:

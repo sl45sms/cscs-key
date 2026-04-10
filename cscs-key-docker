@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMAGE_NAME="${CSCS_KEY_IMAGE:-cscs-key}"
+FORCE_BUILD=0
+
+if [[ "${1:-}" == "--build" ]]; then
+  FORCE_BUILD=1
+  shift
+fi
+
+if [[ $# -eq 0 ]]; then
+  set -- --help
+fi
+
+if [[ "$FORCE_BUILD" -eq 1 ]] || ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+  echo "Building Docker image '$IMAGE_NAME'..."
+  docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+fi
+
+mkdir -p \
+  "$HOME/.ssh" \
+  "$HOME/.config/cscs-key" \
+  "$HOME/.cache/cscs-key"
+
+args=(
+  --rm
+  -it
+  -p 8765:8765
+  -v "$HOME/.ssh:/home/appuser/.ssh"
+  -v "$HOME/.config/cscs-key:/home/appuser/.config/cscs-key"
+  -v "$HOME/.cache/cscs-key:/home/appuser/.cache/cscs-key"
+)
+
+if [[ -n "${CSCS_API_KEY:-}" ]]; then
+  args+=( -e "CSCS_API_KEY=$CSCS_API_KEY" )
+fi
+
+if [[ -n "${CSCS_KEY_PATH:-}" ]]; then
+  args+=( -e "CSCS_KEY_PATH=$CSCS_KEY_PATH" )
+fi
+
+exec docker run "${args[@]}" "$IMAGE_NAME" "$@"

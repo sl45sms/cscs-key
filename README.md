@@ -54,6 +54,8 @@ docker run --rm -it \
   cscs-key sign
 ```
 
+If `~/.ssh/cscs-key.pub` does not exist but `~/.ssh/cscs-key` does, the container generates the missing public key automatically before signing.
+
 For CI or service-account usage, pass the API key explicitly:
 ```bash
 docker run --rm \

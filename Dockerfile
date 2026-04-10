@@ -21,12 +21,16 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         libssl3 \
+        openssh-client \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /work
 
 COPY --from=builder /app/target/release/cscs-key /usr/local/bin/cscs-key
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV HOME=/home/appuser \
     CSCS_OIDC_REDIRECT_URL=http://localhost:8765 \
@@ -34,5 +38,5 @@ ENV HOME=/home/appuser \
 
 USER appuser
 
-ENTRYPOINT ["cscs-key"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["--help"]

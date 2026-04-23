@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cscs-key UI</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"></div>
+    <main class="shell">
+      <section class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Local Browser Companion</p>
+          <h1>cscs-key Control Room</h1>
+          <p class="lede">
+            Run the existing cscs-key CLI from a small browser UI on macOS or Linux.
+            Authentication still uses the normal CSCS browser flow.
+          </p>
+        </div>
+        <div class="meta-grid">
+          <article class="meta-card">
+            <span>Binary</span>
+            <strong id="binary-path">Detecting...</strong>
+          </article>
+          <article class="meta-card">
+            <span>Default key path</span>
+            <strong id="default-key-path">Loading...</strong>
+          </article>
+          <article class="meta-card">
+            <span>Repository root</span>
+            <strong id="repo-root">Loading...</strong>
+          </article>
+          <article class="meta-card">
+            <span>Platform</span>
+            <strong id="platform">Loading...</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="notice panel">
+        <p>
+          If a command needs login, complete the CSCS authentication flow in the browser window opened by the CLI.
+          Override the detected binary with <code>CSCS_KEY_BIN=/path/to/cscs-key</code> or <code>--bin</code> when launching the UI.
+        </p>
+      </section>
+
+      <section class="command-grid">
+        <article class="card panel">
+          <div class="card-head">
+            <h2>Download New Key Pair</h2>
+            <p>Create a fresh SSH key pair and certificate using the current CSCS account.</p>
+          </div>
+          <form class="command-form" data-command="gen" data-label="Generate new key pair">
+            <label class="field">
+              <span>Environment</span>
+              <select name="env">
+                <option value="prod">Production</option>
+                <option value="tds">TDS</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Private key path</span>
+              <input type="text" name="file" data-default-key-path placeholder="/home/user/.ssh/cscs-key">
+            </label>
+            <label class="field">
+              <span>Duration</span>
+              <select name="duration">
+                <option value="1d">1 day</option>
+                <option value="1min">1 minute</option>
+              </select>
+            </label>
+            <button type="submit">Run generate</button>
+          </form>
+        </article>
+
+        <article class="card panel">
+          <div class="card-head">
+            <h2>Sign Existing Key</h2>
+            <p>Sign an existing public key and write the certificate next to the selected private key.</p>
+          </div>
+          <form class="command-form" data-command="sign" data-label="Sign existing key">
+            <label class="field">
+              <span>Environment</span>
+              <select name="env">
+                <option value="prod">Production</option>
+                <option value="tds">TDS</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Private key path</span>
+              <input type="text" name="file" data-default-key-path placeholder="/home/user/.ssh/cscs-key">
+            </label>
+            <label class="field">
+              <span>Duration</span>
+              <select name="duration">
+                <option value="1d">1 day</option>
+                <option value="1min">1 minute</option>
+              </select>
+            </label>
+            <button type="submit">Run sign</button>
+          </form>
+        </article>
+
+        <article class="card panel">
+          <div class="card-head">
+            <h2>List Certificates</h2>
+            <p>Fetch the certificates attached to the authenticated CSCS account.</p>
+          </div>
+          <form class="command-form" data-command="list" data-label="List certificates">
+            <label class="field">
+              <span>Environment</span>
+              <select name="env">
+                <option value="prod">Production</option>
+                <option value="tds">TDS</option>
+              </select>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" name="all">
+              <span>Include expired and revoked certificates</span>
+            </label>
+            <button type="submit">Run list</button>
+          </form>
+        </article>
+
+        <article class="card panel">
+          <div class="card-head">
+            <h2>Revoke Certificates</h2>
+            <p>Revoke one or more certificate serial numbers, or revoke every active certificate.</p>
+          </div>
+          <form class="command-form" data-command="revoke" data-label="Revoke certificates">
+            <label class="field">
+              <span>Environment</span>
+              <select name="env">
+                <option value="prod">Production</option>
+                <option value="tds">TDS</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Serial numbers</span>
+              <textarea id="revoke-key-ids" name="keyIds" rows="4" placeholder="Paste one or more serial numbers, separated by spaces, commas, or new lines."></textarea>
+            </label>
+            <div class="toggle-row">
+              <label class="toggle">
+                <input id="revoke-all" type="checkbox" name="all">
+                <span>Revoke all certificates</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" name="dry">
+                <span>Dry run only</span>
+              </label>
+            </div>
+            <button type="submit">Run revoke</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="console panel">
+        <div class="console-head">
+          <div>
+            <p class="eyebrow">Command Output</p>
+            <h2>CLI Session</h2>
+          </div>
+          <div id="run-status" class="status-pill" data-state="idle">Idle</div>
+        </div>
+        <p id="command-summary" class="command-summary">No command has been run yet.</p>
+        <p id="command-timestamp" class="command-timestamp">Waiting for input.</p>
+        <pre id="command-output" class="command-output">Use any card above to run the existing cscs-key CLI from your browser.</pre>
+      </section>
+    </main>
+  </body>
+</html>

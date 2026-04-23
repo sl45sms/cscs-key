@@ -12,11 +12,11 @@
     <main class="shell">
       <section class="hero panel">
         <div class="hero-copy">
-          <p class="eyebrow">Local Browser Companion</p>
+          <p class="eyebrow">Desktop Shell</p>
           <h1>cscs-key Control Room</h1>
           <p class="lede">
-            Run the existing cscs-key CLI from a small browser UI on macOS or Linux.
-            Authentication still uses the normal CSCS browser flow.
+            Run the existing cscs-key CLI inside a native desktop window on macOS or Linux.
+            Authentication still uses the normal CSCS browser flow when the CLI needs it.
           </p>
         </div>
         <div class="meta-grid">
@@ -41,7 +41,7 @@
 
       <section class="notice panel">
         <p>
-          If a command needs login, complete the CSCS authentication flow in the browser window opened by the CLI.
+          The default launch mode opens this UI inside its own desktop window. Use <code>--browser</code> to fall back to a normal browser tab, or <code>--headless</code> to run only the local server.
           Override the detected binary with <code>CSCS_KEY_BIN=/path/to/cscs-key</code> or <code>--bin</code> when launching the UI.
         </p>
       </section>

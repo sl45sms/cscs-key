@@ -1,7 +1,8 @@
-use std::net::SocketAddr;
+use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
+use std::thread;
 
 use anyhow::{Context, anyhow};
 use axum::http::{StatusCode, header};
@@ -12,7 +13,18 @@ use axum::{Json, Router};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
+use tokio::runtime::Builder as RuntimeBuilder;
+use tokio::sync::oneshot;
+use tao::dpi::LogicalSize;
+use tao::event::{Event, WindowEvent};
+use tao::event_loop::{ControlFlow, EventLoop};
+use tao::platform::run_return::EventLoopExtRunReturn;
+use tao::window::WindowBuilder;
 use tracing::{info, warn};
+use wry::WebViewBuilder;
+
+const APP_TITLE: &str = "CSCS Key";
+const BUNDLED_CLI_NAME: &str = "cscs-key";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Local web UI for cscs-key")]
@@ -23,8 +35,16 @@ struct Args {
     port: u16,
     #[arg(long)]
     bin: Option<PathBuf>,
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help = "Open the UI in the system browser instead of the desktop shell")]
+    browser: bool,
+    #[arg(long, default_value_t = false, help = "Start the local server without opening a window")]
+    headless: bool,
+    #[arg(long, hide = true, default_value_t = false)]
     no_open_browser: bool,
+    #[arg(long, default_value_t = 1320.0, help = "Initial desktop window width")]
+    window_width: f64,
+    #[arg(long, default_value_t = 900.0, help = "Initial desktop window height")]
+    window_height: f64,
 }
 
 #[derive(Clone)]
@@ -148,53 +168,152 @@ const INDEX_HTML: &str = include_str!("../static/index.html");
 const STYLES_CSS: &str = include_str!("../static/styles.css");
 const APP_JS: &str = include_str!("../static/app.js");
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)
         .init();
 
-    let args = Args::parse();
+    let mut args = Args::parse();
+    if args.no_open_browser {
+        args.headless = true;
+    }
+
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .context("UI manifest is missing a parent directory")?
         .to_path_buf();
     let binary_path = resolve_binary_path(args.bin.as_deref(), &repo_root)?;
 
-    let listener = tokio::net::TcpListener::bind((args.host.as_str(), args.port))
-        .await
-        .with_context(|| format!("failed to bind {}:{}", args.host, args.port))?;
-    let addr: SocketAddr = listener.local_addr()?;
-
     let state = Arc::new(AppState {
         binary_path,
         repo_root,
     });
-    let app = Router::new()
+    let app = build_app(state);
+
+    if args.browser || args.headless {
+        return run_foreground_mode(app, &args);
+    }
+
+    run_desktop_mode(app, &args)
+}
+
+fn build_app(state: Arc<AppState>) -> Router {
+    Router::new()
         .route("/", get(index))
         .route("/assets/styles.css", get(styles))
         .route("/assets/app.js", get(script))
         .route("/api/meta", get(meta))
         .route("/api/run", post(run_command))
-        .with_state(state);
+        .with_state(state)
+}
 
-    let url = format!("http://{}", addr);
-    info!("cscs-key UI listening on {url}");
-    println!("Open {url}");
+fn run_foreground_mode(app: Router, args: &Args) -> anyhow::Result<()> {
+    let runtime = build_runtime()?;
 
-    if !args.no_open_browser {
-        if let Err(error) = webbrowser::open(&url) {
-            warn!("failed to open browser: {error}");
+    runtime.block_on(async move {
+        let listener = tokio::net::TcpListener::bind((args.host.as_str(), args.port))
+            .await
+            .with_context(|| format!("failed to bind {}:{}", args.host, args.port))?;
+        let addr: SocketAddr = listener.local_addr()?;
+        let url = format!("http://{}", addr);
+        announce_url(&url);
+
+        if args.browser {
+            if let Err(error) = webbrowser::open(&url) {
+                warn!("failed to open browser: {error}");
+            }
         }
-    }
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+
+        Ok(())
+    })
+}
+
+fn run_desktop_mode(app: Router, args: &Args) -> anyhow::Result<()> {
+    let listener = TcpListener::bind((args.host.as_str(), args.port))
+        .with_context(|| format!("failed to bind {}:{}", args.host, args.port))?;
+    listener
+        .set_nonblocking(true)
+        .context("failed to set desktop listener to non-blocking mode")?;
+    let addr: SocketAddr = listener.local_addr()?;
+    let url = format!("http://{}", addr);
+    announce_url(&url);
+
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+    let server_handle = thread::spawn(move || -> anyhow::Result<()> {
+        let runtime = build_runtime()?;
+        runtime.block_on(async move {
+            let listener = tokio::net::TcpListener::from_std(listener)
+                .context("failed to transfer desktop listener to async runtime")?;
+
+            axum::serve(listener, app)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                })
+                .await?;
+
+            Ok(())
+        })
+    });
+
+    let window_result = run_webview_window(args, &url);
+    let _ = shutdown_tx.send(());
+
+    let server_result = match server_handle.join() {
+        Ok(result) => result,
+        Err(_) => Err(anyhow!("desktop UI server thread panicked")),
+    };
+
+    window_result?;
+    server_result?;
 
     Ok(())
+}
+
+fn run_webview_window(args: &Args, url: &str) -> anyhow::Result<()> {
+    let mut event_loop = EventLoop::new();
+    let window = WindowBuilder::new()
+        .with_title(APP_TITLE)
+        .with_inner_size(LogicalSize::new(args.window_width, args.window_height))
+        .with_min_inner_size(LogicalSize::new(960.0, 720.0))
+        .build(&event_loop)
+        .context("failed to create desktop window")?;
+
+    let _webview = WebViewBuilder::new()
+        .with_url(url)
+        .build(&window)
+        .context("failed to build desktop webview")?;
+
+    event_loop.run_return(|event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+
+        if let Event::WindowEvent {
+            event: WindowEvent::CloseRequested,
+            ..
+        } = event
+        {
+            *control_flow = ControlFlow::Exit;
+        }
+    });
+
+    Ok(())
+}
+
+fn announce_url(url: &str) {
+    info!("{APP_TITLE} listening on {url}");
+    println!("Open {url}");
+}
+
+fn build_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+    RuntimeBuilder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("failed to build async runtime")
 }
 
 async fn index() -> impl IntoResponse {
@@ -376,6 +495,10 @@ fn resolve_binary_path(explicit: Option<&Path>, repo_root: &Path) -> anyhow::Res
         return Ok(PathBuf::from(path));
     }
 
+    if let Some(path) = bundled_binary_path() {
+        return Ok(path);
+    }
+
     let candidates = [
         repo_root.join("target/release/cscs-key"),
         repo_root.join("target/debug/cscs-key"),
@@ -389,9 +512,16 @@ fn resolve_binary_path(explicit: Option<&Path>, repo_root: &Path) -> anyhow::Res
 
     which::which("cscs-key").map_err(|_| {
         anyhow!(
-            "could not locate cscs-key. Build the project first or pass --bin /path/to/cscs-key"
+            "could not locate cscs-key. Build the project first, use the packaged app bundle, or pass --bin /path/to/cscs-key"
         )
     })
+}
+
+fn bundled_binary_path() -> Option<PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let contents_dir = executable.parent()?.parent()?;
+    let candidate = contents_dir.join("Resources/bin").join(BUNDLED_CLI_NAME);
+    candidate.exists().then_some(candidate)
 }
 
 fn default_key_path() -> PathBuf {
